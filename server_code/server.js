@@ -15,7 +15,7 @@ const {
   NEXTCLOUD_PASSWORD,
 } = process.env;
 
-const downloadsDir = "/app/downloads";
+const downloadsDir = "/downloads";
 if (!fs.existsSync(downloadsDir)) {
   fs.mkdirSync(downloadsDir);
 }
