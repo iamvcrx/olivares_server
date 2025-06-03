@@ -1,0 +1,21 @@
+{
+  "name": "olivares_server",
+  "version": "1.0.0",
+  "description": "A vocal server for WhatsApp for an artistic creation by Clara Olivares.",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "author": "WhatsApp Team",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.9.0",
+    "express": "^5.1.0",
+    "dotenv": "^16.3.1"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "keywords": []
+}
