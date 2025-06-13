@@ -2,6 +2,9 @@ import express from "express";
 import axios from "axios";
 import fs from "fs";
 import path from "path";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const app = express();
 app.use(express.json());
@@ -15,9 +18,9 @@ const {
   NEXTCLOUD_PASSWORD,
 } = process.env;
 
-const downloadsDir = "/downloads";
+const downloadsDir = path.join(process.cwd(), "whatsapp-messages");
 if (!fs.existsSync(downloadsDir)) {
-  fs.mkdirSync(downloadsDir);
+  fs.mkdirSync(downloadsDir, { recursive: true });
 }
 
 app.post("/webhook", async (req, res) => {
@@ -33,7 +36,7 @@ app.post("/webhook", async (req, res) => {
       {
         messaging_product: "whatsapp",
         to: message.from,
-        text: { body: "Echo: " + message.text.body + " et ouais je suis un génie" },
+        text: { body: "Echo: " + message.text.body + " from github project" },
         context: { message_id: message.id },
       },
       { headers: { Authorization: `Bearer ${GRAPH_API_TOKEN}` } }
