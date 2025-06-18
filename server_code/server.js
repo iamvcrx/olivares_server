@@ -31,12 +31,19 @@ app.post("/webhook", async (req, res) => {
 
   // Texte
   if (message?.type === "text") {
+    // Getting date and sending back automatic response
+    const timestamp = message.timestamp;
+    const date = new Date(message.timestamp * 1000);
+    const hours = date.getHours().toString().padStart(2, "0");
+    const minutes = date.getMinutes().toString().padStart(2, "0");
+    const seconds = date.getSeconds().toString().padStart(2, "0");
     await axios.post(
       `https://graph.facebook.com/v18.0/${business_phone_number_id}/messages`,
       {
         messaging_product: "whatsapp",
         to: message.from,
-        text: { body: "(Test-Phase): I'm receiving your messages and sending you this automatically !" },
+        // text: { body: "(Test-Phase): I'm receiving your messages and sending you this automatically !" },
+        text: { body: `(Test-Phase): ${message.text.body} received successfully at ${hours}:${minutes}:${seconds}.` },
         context: { message_id: message.id },
       },
       { headers: { Authorization: `Bearer ${GRAPH_API_TOKEN}` } }
