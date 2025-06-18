@@ -36,7 +36,7 @@ app.post("/webhook", async (req, res) => {
       {
         messaging_product: "whatsapp",
         to: message.from,
-        text: { body: "Echo: " + message.text.body + " from github project" },
+        text: { body: "(Test-Phase): I'm receiving your messages and sending you this automatically !" },
         context: { message_id: message.id },
       },
       { headers: { Authorization: `Bearer ${GRAPH_API_TOKEN}` } }
@@ -63,25 +63,6 @@ app.post("/webhook", async (req, res) => {
     const phoneNumber = message.from;
     const timestamp = message.timestamp;
 
-    // Répondre automatiquement au message vocal
-    //try {
-      //await axios.post(
-        //`https://graph.facebook.com/v18.0/${business_phone_number_id}/messages`,
-        //{
-          //messaging_product: "whatsapp",
-          //to: phoneNumber,
-          //text: {
-            //body: "insérer réponse automatique",
-          //},
-          //context: { message_id: message.id },
-        //},
-        //{ headers: { Authorization: `Bearer ${GRAPH_API_TOKEN}` } }
-      //);
-      //console.log("✅ Réponse automatique envoyée");
-    //} catch (autoReplyErr) {
-      //console.error("❌ Erreur lors de l'envoi de la réponse automatique :", autoReplyErr.message);
-    //}
-
     // Télécharger et enregistrer le message vocal
     try {
       const mediaUrlRes = await axios.get(
@@ -103,6 +84,31 @@ app.post("/webhook", async (req, res) => {
 
       writer.on("finish", async () => {
         console.log("✅ Message vocal téléchargé localement :", fileName);
+        
+        // Répondre automatiquement au message vocal
+        //get message reception time in hour, mintues and seconds
+        const date = new Date(message.timestamp * 1000);
+        const hours = date.getHours().toString().padStart(2, "0");
+        const minutes = date.getMinutes().toString().padStart(2, "0");
+        const seconds = date.getSeconds().toString().padStart(2, "0");
+        try {
+          await axios.post(
+            `https://graph.facebook.com/v18.0/${business_phone_number_id}/messages`,
+            {
+              messaging_product: "whatsapp",
+              to: phoneNumber,
+              text: {
+                body: "(Test-Phase): Vocal received and saved successfully at " +
+                  `${hours}:${minutes}:${seconds}.`,
+              },
+              context: { message_id: message.id },
+            },
+            { headers: { Authorization: `Bearer ${GRAPH_API_TOKEN}` } }
+          );
+          console.log("✅ Réponse automatique envoyée");
+        } catch (autoReplyErr) {
+          console.error("❌ Erreur lors de l'envoi de la réponse automatique :", autoReplyErr.message);
+        }
 
         const nextcloudPath = `${NEXTCLOUD_URL}${fileName}`;
 
