@@ -23,54 +23,95 @@ if (!fs.existsSync(downloadsDir)) {
   fs.mkdirSync(downloadsDir, { recursive: true });
 }
 
+// Créer le fichier log.csv s’il n’existe pas
+const logPath = path.join(process.cwd(), "log.csv");
+if (!fs.existsSync(logPath)) {
+  fs.writeFileSync(
+    logPath,
+    "timestamp,phone_number,contact_name,message_type,download_status,nextcloud_status,error\n"
+  );
+}
+
+// Fonction pour journaliser une ligne
+function logMessage({ phone, name, type, download, nextcloud, error = "" }) {
+  const timestamp = new Date().toISOString();
+  const line = `${timestamp},${phone},"${name}",${type},${download},${nextcloud},"${error.replace(/"/g, "'")}"\n`;
+  fs.appendFile(logPath, line, (err) => {
+    if (err) console.error("❌ Erreur d'écriture du log :", err);
+  });
+}
+
 app.post("/webhook", async (req, res) => {
   console.log("Incoming webhook message:", JSON.stringify(req.body, null, 2));
   const message = req.body.entry?.[0]?.changes[0]?.value?.messages?.[0];
   const business_phone_number_id =
     req.body.entry?.[0].changes?.[0].value?.metadata?.phone_number_id;
 
+  if (!message) return res.sendStatus(200);
+
+  const profileNameRaw =
+    req.body.entry?.[0]?.changes?.[0]?.value?.contacts?.[0]?.profile?.name || "unknown";
+  const profileName = profileNameRaw.replace(/\s+/g, "-");
+  const phoneNumber = message.from;
+
   // Texte
   if (message?.type === "text") {
-    // Getting date and sending back automatic response
     const timestamp = message.timestamp;
-    const date = new Date(message.timestamp * 1000);
-    const hours = date.getHours().toString().padStart(2, "0");
-    const minutes = date.getMinutes().toString().padStart(2, "0");
-    const seconds = date.getSeconds().toString().padStart(2, "0");
-    await axios.post(
-      `https://graph.facebook.com/v18.0/${business_phone_number_id}/messages`,
-      {
-        messaging_product: "whatsapp",
-        to: message.from,
-        // text: { body: "(Test-Phase): I'm receiving your messages and sending you this automatically !" },
-        text: { body: `(Test-Phase): ${message.text.body} received successfully at ${hours}:${minutes}:${seconds}.` },
-        context: { message_id: message.id },
-      },
-      { headers: { Authorization: `Bearer ${GRAPH_API_TOKEN}` } }
-    );
+    const date = new Date(timestamp * 1000);
+    const h = date.getHours().toString().padStart(2, "0");
+    const m = date.getMinutes().toString().padStart(2, "0");
+    const s = date.getSeconds().toString().padStart(2, "0");
 
-    await axios.post(
-      `https://graph.facebook.com/v18.0/${business_phone_number_id}/messages`,
-      {
-        messaging_product: "whatsapp",
-        status: "read",
-        message_id: message.id,
-      },
-      { headers: { Authorization: `Bearer ${GRAPH_API_TOKEN}` } }
-    );
+    try {
+      await axios.post(
+        `https://graph.facebook.com/v18.0/${business_phone_number_id}/messages`,
+        {
+          messaging_product: "whatsapp",
+          to: message.from,
+          text: {
+            body: `(Test-Phase): ${message.text.body} received successfully at ${h}:${m}:${s}.`,
+          },
+          context: { message_id: message.id },
+        },
+        { headers: { Authorization: `Bearer ${GRAPH_API_TOKEN}` } }
+      );
+
+      await axios.post(
+        `https://graph.facebook.com/v18.0/${business_phone_number_id}/messages`,
+        {
+          messaging_product: "whatsapp",
+          status: "read",
+          message_id: message.id,
+        },
+        { headers: { Authorization: `Bearer ${GRAPH_API_TOKEN}` } }
+      );
+
+      logMessage({
+        phone: phoneNumber,
+        name: profileName,
+        type: "text",
+        download: "n/a",
+        nextcloud: "n/a",
+      });
+    } catch (err) {
+      logMessage({
+        phone: phoneNumber,
+        name: profileName,
+        type: "text",
+        download: "n/a",
+        nextcloud: "n/a",
+        error: err.message,
+      });
+    }
   }
 
   // Audio
   if (message?.type === "audio") {
     const mediaId = message.audio.id;
-
-    const profileNameRaw =
-      req.body.entry?.[0]?.changes?.[0]?.value?.contacts?.[0]?.profile?.name || "unknown";
-    const profileName = profileNameRaw.replace(/\s+/g, "-");
-    const phoneNumber = message.from;
     const timestamp = message.timestamp;
+    const fileName = `${profileName}_${phoneNumber}_${timestamp}.ogg`;
+    const filePath = path.join(downloadsDir, fileName);
 
-    // Télécharger et enregistrer le message vocal
     try {
       const mediaUrlRes = await axios.get(
         `https://graph.facebook.com/v18.0/${mediaId}`,
@@ -83,21 +124,18 @@ app.post("/webhook", async (req, res) => {
         responseType: "stream",
       });
 
-      const fileName = `${profileName}_${phoneNumber}_${timestamp}.ogg`;
-      const filePath = path.join(downloadsDir, fileName);
-
       const writer = fs.createWriteStream(filePath);
       audioRes.data.pipe(writer);
 
       writer.on("finish", async () => {
         console.log("✅ Message vocal téléchargé localement :", fileName);
-        
-        // Répondre automatiquement au message vocal
-        //get message reception time in hour, mintues and seconds
-        const date = new Date(message.timestamp * 1000);
-        const hours = date.getHours().toString().padStart(2, "0");
-        const minutes = date.getMinutes().toString().padStart(2, "0");
-        const seconds = date.getSeconds().toString().padStart(2, "0");
+
+        // Répondre automatiquement
+        const date = new Date(timestamp * 1000);
+        const h = date.getHours().toString().padStart(2, "0");
+        const m = date.getMinutes().toString().padStart(2, "0");
+        const s = date.getSeconds().toString().padStart(2, "0");
+
         try {
           await axios.post(
             `https://graph.facebook.com/v18.0/${business_phone_number_id}/messages`,
@@ -105,8 +143,7 @@ app.post("/webhook", async (req, res) => {
               messaging_product: "whatsapp",
               to: phoneNumber,
               text: {
-                body: "(Test-Phase): Vocal received and saved successfully at " +
-                  `${hours}:${minutes}:${seconds}.`,
+                body: `(Test-Phase): Vocal received and saved successfully at ${h}:${m}:${s}.`,
               },
               context: { message_id: message.id },
             },
@@ -117,30 +154,59 @@ app.post("/webhook", async (req, res) => {
           console.error("❌ Erreur lors de l'envoi de la réponse automatique :", autoReplyErr.message);
         }
 
-        const nextcloudPath = `${NEXTCLOUD_URL}${fileName}`;
-
         try {
           const fileStream = fs.createReadStream(filePath);
+          const nextcloudPath = `${NEXTCLOUD_URL}${fileName}`;
           await axios.put(nextcloudPath, fileStream, {
             auth: {
               username: NEXTCLOUD_USERNAME,
               password: NEXTCLOUD_PASSWORD,
             },
-            headers: {
-              "Content-Type": "audio/ogg",
-            },
+            headers: { "Content-Type": "audio/ogg" },
           });
           console.log("✅ Fichier transféré vers Nextcloud :", nextcloudPath);
+
+          logMessage({
+            phone: phoneNumber,
+            name: profileName,
+            type: "audio",
+            download: "success",
+            nextcloud: "success",
+          });
         } catch (uploadErr) {
+          logMessage({
+            phone: phoneNumber,
+            name: profileName,
+            type: "audio",
+            download: "success",
+            nextcloud: "failed",
+            error: uploadErr.message,
+          });
           console.error("❌ Erreur lors de l'envoi vers Nextcloud :", uploadErr.message);
         }
       });
 
       writer.on("error", (err) => {
         console.error("❌ Erreur d'écriture du fichier :", err);
+        logMessage({
+          phone: phoneNumber,
+          name: profileName,
+          type: "audio",
+          download: "failed",
+          nextcloud: "n/a",
+          error: err.message,
+        });
       });
     } catch (err) {
       console.error("❌ Erreur lors du téléchargement du message vocal :", err.message);
+      logMessage({
+        phone: phoneNumber,
+        name: profileName,
+        type: "audio",
+        download: "failed",
+        nextcloud: "n/a",
+        error: err.message,
+      });
     }
   }
 
