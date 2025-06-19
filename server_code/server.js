@@ -32,12 +32,35 @@ if (!fs.existsSync(logPath)) {
   );
 }
 
-// Fonction pour journaliser une ligne
+// Création d'un log à chaque message reçu, envoyé sur Nextcloud
 function logMessage({ phone, name, type, download, nextcloud, error = "" }) {
   const timestamp = new Date().toISOString();
   const line = `${timestamp},${phone},"${name}",${type},${download},${nextcloud},"${error.replace(/"/g, "'")}"\n`;
-  fs.appendFile(logPath, line, (err) => {
-    if (err) console.error("❌ Erreur d'écriture du log :", err);
+  
+  fs.appendFile(logPath, line, async (err) => {
+    if (err) {
+      console.error("❌ Erreur d'écriture du log :", err);
+      return;
+    }
+
+    // Upload du fichier log.csv vers Nextcloud
+    const fileStream = fs.createReadStream(logPath);
+    const nextcloudLogPath = `${NEXTCLOUD_URL}log.csv`;
+
+    try {
+      await axios.put(nextcloudLogPath, fileStream, {
+        auth: {
+          username: NEXTCLOUD_USERNAME,
+          password: NEXTCLOUD_PASSWORD,
+        },
+        headers: {
+          "Content-Type": "text/csv",
+        },
+      });
+      console.log("✅ log.csv mis à jour sur Nextcloud.");
+    } catch (uploadErr) {
+      console.error("❌ Erreur lors de l'envoi de log.csv :", uploadErr.message);
+    }
   });
 }
 
@@ -209,7 +232,7 @@ app.post("/webhook", async (req, res) => {
       });
     }
   }
-
+  
   res.sendStatus(200);
 });
 
