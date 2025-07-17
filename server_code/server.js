@@ -92,7 +92,8 @@ app.post("/webhook", async (req, res) => {
           messaging_product: "whatsapp",
           to: message.from,
           text: {
-            body: `(Test-Phase): ${message.text.body} received successfully at ${h}:${m}:${s}.`,
+            // body: `(Test-Phase): ${message.text.body} received successfully at ${h}:${m}:${s}.`,
+            body: `(Automatic Response) : Only vocal messages will be stored and used for the creation. Please send a vocal message to participate !`,
           },
           context: { message_id: message.id },
         },
@@ -166,7 +167,10 @@ app.post("/webhook", async (req, res) => {
               messaging_product: "whatsapp",
               to: phoneNumber,
               text: {
-                body: `(Test-Phase): Vocal received and saved successfully at ${h}:${m}:${s}.`,
+                // body: `(Test-Phase): Vocal received and saved successfully at ${h}:${m}:${s}.`,
+                body: `(Automatic Response) : Your vocal message was received and stored successfully ! Thank you for your participation. \n
+                You can continue to send vocal messages if you want to participate further in the project. \n \n
+                If you want this message not to be used, you can contact us at bigand@ircam.fr & carre@ircam.fr. Please provide the timestamp of your message: ${h}:${m}:${s}.`,
               },
               context: { message_id: message.id },
             },
